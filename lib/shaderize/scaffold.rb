@@ -1,5 +1,6 @@
 require 'rubygems'
 require 'mustache'
+require 'digest/sha1'
 
 
 module Shaderize
@@ -34,9 +35,9 @@ module Shaderize
         source_mtime = [mtime(template), shaders_mtime, mtime(__FILE__)].max
         target = File.join(output_dir, File.basename(template, File.extname(template)))
         target_mtime = mtime(target)
-        if source_mtime > target_mtime
-          contents = Mustache.render(File.read(template), :shaders => shaders.values)
-          File.open(target, "w") {|f| f.write(contents) }
+        target_data = Mustache.render(File.read(template), :shaders => shaders.values)
+        if source_mtime > target_mtime or different?(target, target_data)
+          File.open(target, "w") {|f| f.write(target_data) }
           puts "Shaderized: #{File.basename(target)}"
         end
       end
@@ -50,6 +51,21 @@ module Shaderize
       File.mtime(filename).to_i
     rescue
       0
+    end
+
+    def self.hash(filename)
+      hash = Digest::SHA1.new
+      open(filename, "r") do |io|
+        until io.eof
+          hash.update(io.readpartial(1024))
+        end
+      end
+      hash.hexdigest
+    end
+
+    def self.different?(filename, contents)
+      return true if File.size(filename) != contents.size
+      hash(filename) != Digest::SHA1.hexdigest(contents)
     end
 
   end
